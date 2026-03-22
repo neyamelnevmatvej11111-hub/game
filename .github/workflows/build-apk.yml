@@ -34,79 +34,22 @@ jobs:
           unzip -q templates.tpz
           mv templates/* ~/.local/share/godot/export_templates/4.6.stable/
 
-      - name: Configure Godot Android settings
+      - name: Write editor settings
         run: |
           SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          echo "Using Android SDK: $SDK"
           mkdir -p ~/.config/godot
-          python3 -c "
-          sdk = '$SDK'
-          content = '[gd_resource type=\"EditorSettings\" format=3]\n\n[resource]\nexport/android/android_sdk_path = \"' + sdk + '\"\n'
-          open('$HOME/.config/godot/editor_settings-4.tres', 'w').write(content)
-          "
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\n' "$SDK" > ~/.config/godot/editor_settings-4.tres
           cat ~/.config/godot/editor_settings-4.tres
 
-      - name: Generate debug keystore
+      - name: Generate keystore
         run: |
-          keytool -genkey -v \
-            -keystore "$HOME/debug.keystore" \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 \
-            -validity 10000 \
-            -storepass android \
-            -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US"
+          keytool -genkey -v -keystore "$HOME/debug.keystore" -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Create export_presets.cfg
+      - name: Write export presets
         run: |
           mkdir -p build
-          python3 -c "
-          content = '''[preset.0]
-
-name=\"Android\"
-platform=\"Android\"
-runnable=true
-dedicated_server=false
-custom_features=\"\"
-export_filter=\"all_resources\"
-export_path=\"build/SupermarketSimulator.apk\"
-encrypt_pck=false
-encrypt_directory=false
-
-[preset.0.options]
-
-custom_template/debug=\"\"
-custom_template/release=\"\"
-gradle_build/use_gradle_build=false
-architectures/armeabi-v7a=false
-architectures/arm64-v8a=true
-architectures/x86=false
-architectures/x86_64=false
-keystore/debug=\"\"
-keystore/debug_user=\"\"
-keystore/debug_password=\"\"
-keystore/release=\"\"
-keystore/release_user=\"\"
-keystore/release_password=\"\"
-package/unique_name=\"com.game.supermarket3d\"
-package/name=\"Supermarket Simulator 3D\"
-package/signed=false
-package/classify_as_game=true
-package/retain_data_on_uninstall=false
-package/exclude_from_recents=false
-package/show_as_launcher_icon=true
-version/code=1
-version/name=\"1.0\"
-orientation/screen_orientation=0
-screen/immersive_mode=true
-screen/support_small=true
-screen/support_normal=true
-screen/support_large=true
-screen/support_xlarge=true
-'''
-          open('export_presets.cfg', 'w').write(content)
-          print('export_presets.cfg written')
-          "
+          printf '[preset.0]\n\nname="Android"\nplatform="Android"\nrunnable=true\ndedicated_server=false\ncustom_features=""\nexport_filter="all_resources"\nexport_path="build/SupermarketSimulator.apk"\nencrypt_pck=false\nencrypt_directory=false\n\n[preset.0.options]\n\ngradle_build/use_gradle_build=false\narchitectures/armeabi-v7a=false\narchitectures/arm64-v8a=true\narchitectures/x86=false\narchitectures/x86_64=false\nkeystore/debug=""\nkeystore/debug_user=""\nkeystore/debug_password=""\npackage/unique_name="com.game.supermarket3d"\npackage/name="Supermarket Simulator 3D"\npackage/signed=false\npackage/classify_as_game=true\npackage/retain_data_on_uninstall=false\npackage/exclude_from_recents=false\npackage/show_as_launcher_icon=true\nversion/code=1\nversion/name="1.0"\norientation/screen_orientation=0\nscreen/immersive_mode=true\nscreen/support_small=true\nscreen/support_normal=true\nscreen/support_large=true\nscreen/support_xlarge=true\n' > export_presets.cfg
+          cat export_presets.cfg
 
       - name: Export APK
         run: |
