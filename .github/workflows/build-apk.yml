@@ -1,0 +1,123 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Godot 4.6
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip" -O godot.zip
+          unzip -q godot.zip
+          sudo mv Godot_v4.6-stable_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          godot --version
+
+      - name: Install Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.6.stable
+          wget -q "https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_export_templates.tpz" -O templates.tpz
+          unzip -q templates.tpz
+          mv templates/* ~/.local/share/godot/export_templates/4.6.stable/
+
+      - name: Configure Godot Android settings
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "Using Android SDK: $SDK"
+          mkdir -p ~/.config/godot
+          python3 -c "
+          sdk = '$SDK'
+          content = '[gd_resource type=\"EditorSettings\" format=3]\n\n[resource]\nexport/android/android_sdk_path = \"' + sdk + '\"\n'
+          open('$HOME/.config/godot/editor_settings-4.tres', 'w').write(content)
+          "
+          cat ~/.config/godot/editor_settings-4.tres
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkey -v \
+            -keystore "$HOME/debug.keystore" \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Create export_presets.cfg
+        run: |
+          mkdir -p build
+          python3 -c "
+          content = '''[preset.0]
+
+name=\"Android\"
+platform=\"Android\"
+runnable=true
+dedicated_server=false
+custom_features=\"\"
+export_filter=\"all_resources\"
+export_path=\"build/SupermarketSimulator.apk\"
+encrypt_pck=false
+encrypt_directory=false
+
+[preset.0.options]
+
+custom_template/debug=\"\"
+custom_template/release=\"\"
+gradle_build/use_gradle_build=false
+architectures/armeabi-v7a=false
+architectures/arm64-v8a=true
+architectures/x86=false
+architectures/x86_64=false
+keystore/debug=\"\"
+keystore/debug_user=\"\"
+keystore/debug_password=\"\"
+keystore/release=\"\"
+keystore/release_user=\"\"
+keystore/release_password=\"\"
+package/unique_name=\"com.game.supermarket3d\"
+package/name=\"Supermarket Simulator 3D\"
+package/signed=false
+package/classify_as_game=true
+package/retain_data_on_uninstall=false
+package/exclude_from_recents=false
+package/show_as_launcher_icon=true
+version/code=1
+version/name=\"1.0\"
+orientation/screen_orientation=0
+screen/immersive_mode=true
+screen/support_small=true
+screen/support_normal=true
+screen/support_large=true
+screen/support_xlarge=true
+'''
+          open('export_presets.cfg', 'w').write(content)
+          print('export_presets.cfg written')
+          "
+
+      - name: Export APK
+        run: |
+          mkdir -p build
+          godot --headless --export-debug "Android" "build/SupermarketSimulator.apk" || true
+          ls -la build/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SupermarketSimulator-APK
+          path: build/SupermarketSimulator.apk
+          if-no-files-found: error
+          retention-days: 30
